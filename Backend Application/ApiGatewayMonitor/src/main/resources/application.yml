@@ -1,0 +1,28 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # Route 1: Data Ingestion (Logs and Metrics from Client Apps)
+        - id: ingestion-service-route
+          uri: http://localhost:8081  # Points to Service 3 (Ingestion)
+          predicates:
+            - Path=/api/v1/telemetry/**
+          filters:
+            - name: ApiKeyFilter      # Applies our custom security bouncer
+
+        # Route 2: Frontend Dashboard API (User viewing their data)
+        - id: dashboard-service-route
+          uri: http://localhost:8084  # Points to Service 5 (AI Analyzer & Dashboard API)
+          predicates:
+            - Path=/api/v1/dashboard/**
+          # No ApiKeyFilter here; you'd use standard JWT authentication for frontend users
+
+        - id: auth-service-route
+          uri: http://localhost:8082  # Points to Service 2 (Auth)
+          predicates:
+            - Path=/api/v1/auth/**
