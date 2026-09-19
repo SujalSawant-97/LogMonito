@@ -30,8 +30,9 @@ public class MonitorAutoConfiguration {
         customAppender.setApiKey(properties.getApiKey());
         customAppender.setAppName(env.getProperty("spring.application.name", "unknown-app"));
 
-        // If you added logLevel to your properties file, set it here. Otherwise, it defaults to WARN.
-        // customAppender.setThresholdLevel(properties.getLogLevel());
+        if (properties.getLogLevel() != null && !properties.getLogLevel().isBlank()) {
+            customAppender.setThresholdLevel(properties.getLogLevel());
+        }
 
         customAppender.start();
 

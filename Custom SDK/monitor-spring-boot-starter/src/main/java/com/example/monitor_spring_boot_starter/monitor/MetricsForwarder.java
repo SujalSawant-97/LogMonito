@@ -1,5 +1,6 @@
 package com.example.monitor_spring_boot_starter.monitor;
 
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -29,14 +30,14 @@ public class MetricsForwarder {
     @Scheduled(fixedRateString = "${monitor.metrics-interval:60000}")
     public void pushMetrics() {
         try {
-            // 1. Extract Metrics from Actuator
-            double processCpu = meterRegistry.get("process.cpu.usage").gauge().value();
-            double jvmMemoryUsed = meterRegistry.get("jvm.memory.used").gauge().value();
+            // 1. Safely Extract Metrics from Actuator
+            double processCpu = getGaugeValue("process.cpu.usage");
+            double jvmMemoryUsed = getGaugeValue("jvm.memory.used");
 
-            // 2. Build Payload (Handle NaN just in case the app is booting and metrics aren't ready)
+            // 2. Build Payload
             Map<String, Object> payload = new HashMap<>();
-            payload.put("cpuUsage", Double.isNaN(processCpu) ? 0.0 : processCpu);
-            payload.put("memoryUsed", Double.isNaN(jvmMemoryUsed) ? 0.0 : jvmMemoryUsed);
+            payload.put("cpuUsage", processCpu);
+            payload.put("memoryUsed", jvmMemoryUsed);
 
             Map<String, String> metadata = new HashMap<>();
             metadata.put("serviceName", appName);
@@ -49,11 +50,24 @@ public class MetricsForwarder {
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-            // 4. Send directly to your Ingestion Service
+            // 4. Send directly to your Ingestion Service (via Gateway)
             restTemplate.postForEntity(serverUrl + "/api/v1/telemetry/metrics", request, String.class);
 
         } catch (Exception ignored) {
             // Fail silently to protect the client's application loop
+        }
+    }
+
+    private double getGaugeValue(String meterName) {
+        try {
+            Gauge gauge = meterRegistry.find(meterName).gauge();
+            if (gauge == null) {
+                return 0.0;
+            }
+            double val = gauge.value();
+            return Double.isNaN(val) ? 0.0 : val;
+        } catch (Exception ignored) {
+            return 0.0;
         }
     }
 }
