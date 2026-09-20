@@ -6,4 +6,9 @@ spring:
     name: auth-service
   data:
     mongodb:
-      uri: mongodb://localhost:27017/ai_monitoring_db
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/ai_monitoring_db}
+
+jwt:
+  # 256-bit secure secret key shared with API Gateway
+  secret: "logmonito-secret-key-for-jwt-signing-must-be-at-least-256-bits-long-32-bytes"
+  expiration-ms: 86400000 # 24 hours

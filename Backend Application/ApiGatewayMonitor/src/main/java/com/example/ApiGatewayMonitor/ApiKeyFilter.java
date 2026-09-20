@@ -11,6 +11,9 @@ public class ApiKeyFilter extends AbstractGatewayFilterFactory<ApiKeyFilter.Conf
 
     private final WebClient.Builder webClientBuilder;
 
+    @org.springframework.beans.factory.annotation.Value("${auth.service.url:http://localhost:8082}")
+    private String authServiceUrl;
+
     public ApiKeyFilter(WebClient.Builder webClientBuilder) {
         super(Config.class);
         this.webClientBuilder = webClientBuilder;
@@ -27,10 +30,10 @@ public class ApiKeyFilter extends AbstractGatewayFilterFactory<ApiKeyFilter.Conf
 
             String apiKey = exchange.getRequest().getHeaders().getFirst("X-API-KEY");
 
-            // 2. Ask the Auth Service (running on port 8082) if this key belongs to a real user
+            // 2. Ask the Auth Service if this key belongs to a real user
             return webClientBuilder.build()
                     .get()
-                    .uri("http://localhost:8082/api/v1/auth/validate")
+                    .uri(authServiceUrl + "/api/v1/auth/validate")
                     .header("X-API-KEY", apiKey)
                     .retrieve()
                     .bodyToMono(String.class)

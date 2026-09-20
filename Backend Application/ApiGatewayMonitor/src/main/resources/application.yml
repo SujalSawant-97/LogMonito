@@ -6,23 +6,55 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
       routes:
-        # Route 1: Data Ingestion (Logs and Metrics from Client Apps)
+        # Route 1: Data Ingestion (Logs and Metrics from Client Apps, validated by API Key)
         - id: ingestion-service-route
-          uri: http://localhost:8081  # Points to Service 3 (Ingestion)
+          uri: ${INGESTION_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/telemetry/**
           filters:
-            - name: ApiKeyFilter      # Applies our custom security bouncer
+            - name: ApiKeyFilter
 
-        # Route 2: Frontend Dashboard API (User viewing their data)
+        # Route 2: Frontend Dashboard API (Protected by JWT)
         - id: dashboard-service-route
-          uri: http://localhost:8084  # Points to Service 5 (AI Analyzer & Dashboard API)
+          uri: ${DASHBOARD_SERVICE_URL:http://localhost:8084}
           predicates:
             - Path=/api/v1/dashboard/**
-          # No ApiKeyFilter here; you'd use standard JWT authentication for frontend users
+          filters:
+            - name: JwtAuthFilter
 
-        - id: auth-service-route
-          uri: http://localhost:8082  # Points to Service 2 (Auth)
+        # Route 3: Auth Service - Project API Key Generation (Protected by JWT)
+        - id: auth-service-generate-key-route
+          uri: ${AUTH_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/auth/generate
+          filters:
+            - name: JwtAuthFilter
+
+        # Route 4: Auth Service - Public Endpoints (Login, Register, and Gateway Validate)
+        - id: auth-service-public-route
+          uri: ${AUTH_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/v1/auth/**
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8082}
+
+jwt:
+  # Shared 256-bit secret matching AuthServiceMon
+  secret: "logmonito-secret-key-for-jwt-signing-must-be-at-least-256-bits-long-32-bytes"
