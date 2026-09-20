@@ -2,9 +2,9 @@ package com.example.IngestionService.controller;
 
 import com.example.IngestionService.dto.LogPayload;
 import com.example.IngestionService.dto.MetricPayload;
+import com.example.IngestionService.service.TelemetryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -12,23 +12,14 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TelemetryController {
 
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-
-    private static final String LOGS_TOPIC = "raw-logs-topic";
-    private static final String METRICS_TOPIC = "raw-metrics-topic";
+    private final TelemetryService telemetryService;
 
     @PostMapping("/logs")
     public ResponseEntity<Void> ingestLog(
             @RequestHeader("X-USER-ID") String userId,
             @RequestBody LogPayload payload) {
 
-        // 1. Securely attach the validated User ID to the payload
-        payload.setUserId(userId);
-
-        // 2. Fire and forget to Kafka
-        kafkaTemplate.send(LOGS_TOPIC, payload);
-
-        // 3. Instantly return 202 Accepted (Don't keep the client waiting)
+        telemetryService.publishLog(userId, payload);
         return ResponseEntity.accepted().build();
     }
 
@@ -37,10 +28,7 @@ public class TelemetryController {
             @RequestHeader("X-USER-ID") String userId,
             @RequestBody MetricPayload payload) {
 
-        payload.setUserId(userId);
-
-        kafkaTemplate.send(METRICS_TOPIC, payload);
-
+        telemetryService.publishMetric(userId, payload);
         return ResponseEntity.accepted().build();
     }
 }

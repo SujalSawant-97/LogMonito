@@ -35,7 +35,8 @@ public class StorageConsumer {
 
             LogEvent.LogMetadata meta = new LogEvent.LogMetadata();
             meta.setUserId(payload.getUserId());
-            meta.setServiceName(payload.getMetadata().get("serviceName"));
+            String serviceName = (payload.getMetadata() != null) ? payload.getMetadata().get("serviceName") : "unknown-service";
+            meta.setServiceName(serviceName);
             event.setMetadata(meta);
 
             logRepository.save(event);
@@ -58,7 +59,8 @@ public class StorageConsumer {
 
             MetricEvent.MetricMetadata meta = new MetricEvent.MetricMetadata();
             meta.setUserId(payload.getUserId());
-            meta.setServiceName(payload.getMetadata().get("serviceName"));
+            String serviceName = (payload.getMetadata() != null) ? payload.getMetadata().get("serviceName") : "unknown-service";
+            meta.setServiceName(serviceName);
             event.setMetadata(meta);
 
             metricRepository.save(event);
