@@ -1,4 +1,8 @@
+package com.example.AnalyzerService.controller;
 
+import com.example.AnalyzerService.model.LogDocument;
+import com.example.AnalyzerService.model.MetricDocument;
+import com.example.AnalyzerService.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,13 +35,13 @@ public class DashboardController {
 
     // AI Analysis 1: Analyze a specific error by its MongoDB ID
     @GetMapping("/ai/analyze/error/{logId}")
-    public ResponseEntity<Map<String, String>> analyzeSpecificError(
+    public ResponseEntity<Map<String, Object>> analyzeSpecificError(
             @RequestHeader("X-USER-ID") String userId,
             @RequestParam String appName,
             @PathVariable String logId) {
 
-        String insight = dashboardService.analyzeSpecificError(userId, appName, logId);
-        return ResponseEntity.ok(Map.of("insight", insight));
+        Map<String, Object> diagnosis = dashboardService.analyzeSpecificError(userId, appName, logId);
+        return ResponseEntity.ok(diagnosis);
     }
 
     // AI Analysis 2: Analyze a time window (e.g., ?minutes=15)

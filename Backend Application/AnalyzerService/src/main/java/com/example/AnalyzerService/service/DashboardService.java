@@ -1,6 +1,11 @@
 package com.example.AnalyzerService.service;
 
+import com.example.AnalyzerService.model.LogDocument;
+import com.example.AnalyzerService.model.MetricDocument;
+import com.example.AnalyzerService.repository.LogRepository;
+import com.example.AnalyzerService.repository.MetricRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,9 +23,8 @@ public class DashboardService {
     private final LogRepository logRepository;
     private final RestTemplate restTemplate = new RestTemplate(); // For calling the Local LLM
 
-    // Standard Ollama endpoint
-    private static final String LOCAL_LLM_URL = "http://localhost:11434/api/generate";
-    private static final String LLM_MODEL = "llama3"; // Change to mistral, qwen, etc.
+    @org.springframework.beans.factory.annotation.Value("${ai.debugger.url:http://localhost:8000/diagnose}")
+    private String aiDebuggerUrl;
 
     // --- 1. DATA FETCHING METHODS ---
 
@@ -36,57 +40,63 @@ public class DashboardService {
 
     // --- 2. AI ANALYSIS METHODS ---
 
-    public String analyzeSpecificError(String userId, String appName, String logId) {
+    public Map<String, Object> analyzeSpecificError(String userId, String appName, String logId) {
         LogDocument errorLog = logRepository.findById(logId)
-                .orElseThrow(() -> new RuntimeException("Log not found"));
+                .orElseThrow(() -> new RuntimeException("Log not found: " + logId));
 
-        String prompt = "You are an expert DevOps engineer. Analyze this specific error log from the application '"
-                + appName + "' and explain what caused it and how to fix it in 3 short bullet points. \n"
-                + "Error Message: " + errorLog.getMessage();
+        // 1. Check if this error was already diagnosed & stored in MongoDB
+        if (errorLog.getDiagnosis() != null && !errorLog.getDiagnosis().isEmpty()) {
+            return errorLog.getDiagnosis();
+        }
 
-        return callLocalLlm(prompt);
+        // 2. Query the Python AI Debugger service
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("logId", logId);
+            requestBody.put("appName", appName);
+            requestBody.put("message", errorLog.getMessage());
+            requestBody.put("logLevel", errorLog.getLogLevel() != null ? errorLog.getLogLevel() : "ERROR");
+
+            Map<String, Object> response = restTemplate.postForObject(aiDebuggerUrl, requestBody, Map.class);
+
+            if (response != null && response.containsKey("summary")) {
+                // 3. Store the diagnosis directly in MongoDB under the LogDocument
+                errorLog.setDiagnosis(response);
+                errorLog.setDiagnosedAt(Instant.now());
+                logRepository.save(errorLog);
+
+                return response;
+            }
+        } catch (Exception e) {
+            System.err.println("AI Debugger Connection Failed: " + e.getMessage());
+        }
+
+        // Fallback if AI debugger is unavailable
+        return Map.of(
+                "summary", "Runtime Incident in " + appName,
+                "cause", "Exception captured in telemetry. The AI Debugger bridge on port 8000 is unavailable.",
+                "solution", "Start the LogMonito AI Debugger service (`run_api.bat`) to enable real-time automated root-cause analysis.",
+                "insight", "AI Debugger bridge on port 8000 was unreachable."
+        );
     }
 
     public String analyzeTimeWindow(String userId, String appName, int minutes) {
-        // Calculate the cutoff time
         Instant cutoffTime = Instant.now().minus(Duration.ofMinutes(minutes));
 
-        // Fetch logs and metrics from that window
         List<LogDocument> recentLogs = logRepository
                 .findByMetadataUserIdAndMetadataServiceNameAndTimestampAfterOrderByTimestampDesc(userId, appName, cutoffTime);
         List<MetricDocument> recentMetrics = metricRepository
                 .findByMetadataUserIdAndMetadataServiceNameAndTimestampAfterOrderByTimestampDesc(userId, appName, cutoffTime);
 
-        // Build a prompt injecting the context
-        String prompt = "You are a DevOps AI. Analyze the system health for the last " + minutes + " minutes. \n" +
-                "Total Logs generated: " + recentLogs.size() + "\n" +
-                "Total Metrics recorded: " + recentMetrics.size() + "\n" +
-                "Are there any spikes or concerning patterns? Keep your answer under 4 sentences.";
+        long errorCount = recentLogs.stream().filter(l -> "ERROR".equalsIgnoreCase(l.getLogLevel())).count();
+        double avgCpu = recentMetrics.stream()
+                .mapToDouble(m -> m.getCpuUsage() != null ? m.getCpuUsage() : 0.0)
+                .average().orElse(0.0);
+        double avgMem = recentMetrics.stream()
+                .mapToDouble(m -> m.getMemoryUsed() != null ? m.getMemoryUsed() : 0.0)
+                .average().orElse(0.0);
 
-        return callLocalLlm(prompt);
-    }
-
-    // --- 3. LOCAL LLM INTEGRATION ---
-
-    private String callLocalLlm(String prompt) {
-        try {
-            // Build the JSON payload for Ollama
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", LLM_MODEL);
-            requestBody.put("prompt", prompt);
-            requestBody.put("stream", false); // We want the whole response at once
-
-            // Make the POST request to your local AI
-            Map<String, Object> response = restTemplate.postForObject(LOCAL_LLM_URL, requestBody, Map.class);
-
-            if (response != null && response.containsKey("response")) {
-                return (String) response.get("response");
-            }
-            return "AI failed to generate an insight.";
-
-        } catch (Exception e) {
-            System.err.println("Local LLM Connection Failed: " + e.getMessage());
-            return "Error: Could not connect to the Local LLM. Is it running on port 11434?";
-        }
+        return String.format("Telemetry Window (%d min): %d logs (%d errors), %d metric ticks. Avg CPU: %.1f%%, Avg Memory: %.1f MB.",
+                minutes, recentLogs.size(), errorCount, recentMetrics.size(), avgCpu, avgMem);
     }
 }
