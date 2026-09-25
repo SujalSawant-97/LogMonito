@@ -1,8 +1,14 @@
+# -*- coding: utf-8 -*-
 import os
 import json
-from typing import Optional, List, Dict, Any
+from typing import Dict, Any
 from pymongo import MongoClient
-from mcp.server.fastmcp import FastMCP
+
+try:
+    from mcp.server.fastmcp import FastMCP
+except (ImportError, ModuleNotFoundError):
+    from mcp.server.mcpserver import MCPServer as FastMCP
+
 from diagnostics import diagnose_spring_error
 
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/ai_monitoring_db")
