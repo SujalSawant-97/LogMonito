@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spring Boot Enterprise Error Diagnostics & Resolution Knowledge Base</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.5;
+    font-size: 13px;
+    margin: 0;
+    padding: 0;
+  }
+  .header-card {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    color: #ffffff;
+    padding: 24px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+  .header-card h1 {
+    margin: 0 0 8px 0;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .header-card p {
+    margin: 4px 0;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  .section-title {
+    font-size: 17px;
+    color: #0f172a;
+    border-bottom: 2px solid #3b82f6;
+    padding-bottom: 6px;
+    margin-top: 26px;
+    margin-bottom: 14px;
+    page-break-after: avoid;
+  }
+  .error-card {
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #3b82f6;
+    border-radius: 6px;
+    background: #ffffff;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    page-break-inside: avoid;
+  }
+  .error-card.critical { border-left-color: #ef4444; }
+  .error-card.warn { border-left-color: #f59e0b; }
+  .error-card.error { border-left-color: #dc2626; }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .error-code {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f172a;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-fatal { background: #fee2e2; color: #991b1b; }
+  .badge-warn { background: #fef3c7; color: #92400e; }
+  .badge-error { background: #fee2e2; color: #b91c1c; }
+
+  .meta-row {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 8px;
+  }
+  pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 12px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    overflow-x: auto;
+    font-family: "Cascadia Code", Consolas, Menlo, monospace;
+    margin: 8px 0;
+  }
+  code {
+    font-family: "Cascadia Code", Consolas, Menlo, monospace;
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  ul, ol {
+    margin: 6px 0;
+    padding-left: 20px;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12px;
+  }
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-card">
+  <h1>Spring Boot Enterprise Error Diagnostics & Resolution Guide</h1>
+  <p><strong>Purpose</strong>: Comprehensive Handbook & Knowledge Base for LogMonito AI / RAG Diagnostic Integration</p>
+  <p><strong>Scope</strong>: Spring Boot 3.x / Java 21 &bull; Microservices &bull; Kafka &bull; MongoDB &bull; Resilience &bull; Security</p>
+</div>
+
+<h2 class="section-title">0. Global Exception Handling Pattern (Spring Boot 3 / RFC 9457)</h2>
+<p>Modern Spring Boot applications standardize error responses using RFC 9457 <code>ProblemDetail</code> managed by a central <code>@RestControllerAdvice</code>:</p>
+<pre><code>@RestControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnhandled(Exception ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
+        problem.setTitle("Internal Server Error");
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @Override
+    protected ResponseEntity&lt;Object&gt; handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest req) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_REQUEST, "Validation constraints failed.");
+        Map&lt;String, String&gt; errors = new HashMap&lt;&gt;();
+        ex.getBindingResult().getFieldErrors().forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
+        problem.setProperty("fieldErrors", errors);
+        return ResponseEntity.status(status).body(problem);
+    }
+}</code></pre>
+
+<h2 class="section-title">1. Startup & Dependency Injection Errors</h2>
+
+<div class="error-card critical">
+  <div class="card-header">
+    <span class="error-code">ERR-START-001: NoSuchBeanDefinitionException</span>
+    <span class="badge badge-fatal">Fatal</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> Spring IoC &bull; <strong>Symptom:</strong> Application startup crash</div>
+  <pre><code>org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.example.service.PaymentService' available</code></pre>
+  <p><strong>Root Cause:</strong> Spring failed to locate a bean of the requested type for constructor/field injection.</p>
+  <ul>
+    <li><strong>Remediation 1:</strong> Ensure the class is annotated with <code>@Service</code>, <code>@Component</code>, or <code>@Repository</code>.</li>
+    <li><strong>Remediation 2:</strong> Check package scanning. Ensure the class resides under the main <code>@SpringBootApplication</code> package or add <code>@ComponentScan</code>.</li>
+    <li><strong>Remediation 3:</strong> If conditionally loaded, check if the required property (e.g., <code>@ConditionalOnProperty</code>) is enabled in <code>application.yml</code>.</li>
+  </ul>
+</div>
+
+<div class="error-card critical">
+  <div class="card-header">
+    <span class="error-code">ERR-START-002: BeanCurrentlyInCreationException (Circular Dependency)</span>
+    <span class="badge badge-fatal">Fatal</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> Spring Lifecycle &bull; <strong>Symptom:</strong> Context fails with circular dependency graph</div>
+  <pre><code>The dependencies of some of the beans in the application context form a cycle:
+serviceA -> serviceB -> serviceA</code></pre>
+  <p><strong>Root Cause:</strong> Two or more beans mutually inject each other at instantiation time. Spring Boot 2.6+ strictly forbids this by default.</p>
+  <ul>
+    <li><strong>Remediation 1 (Best Practice):</strong> Refactor by extracting the mutually shared logic into a separate third service or using Spring Application Events.</li>
+    <li><strong>Remediation 2:</strong> Break the eager construction cycle using <code>@Lazy</code> on one of the constructor parameters: <code>public ServiceA(@Lazy ServiceB b)</code>.</li>
+  </ul>
+</div>
+
+<div class="error-card critical">
+  <div class="card-header">
+    <span class="error-code">ERR-START-003: PortInUseException</span>
+    <span class="badge badge-fatal">Fatal</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> Embedded Web Server &bull; <strong>Symptom:</strong> Web server failed to start</div>
+  <pre><code>org.springframework.boot.web.server.PortInUseException: Port 8080 was already in use.</code></pre>
+  <p><strong>Root Cause:</strong> Another application or previous zombie instance has already bound port 8080.</p>
+  <ul>
+    <li><strong>Remediation 1:</strong> Configure a distinct port in <code>application.properties</code>: <code>server.port=8085</code>.</li>
+    <li><strong>Remediation 2:</strong> Terminate the offending PID: Windows <code>netstat -ano | findstr :8080</code> then <code>taskkill /PID &lt;PID&gt; /F</code>; Linux <code>fuser -k 8080/tcp</code>.</li>
+  </ul>
+</div>
+
+<h2 class="section-title">2. Web & Request Handling Errors</h2>
+
+<div class="error-card warn">
+  <div class="card-header">
+    <span class="error-code">ERR-WEB-001: MethodArgumentNotValidException</span>
+    <span class="badge badge-warn">HTTP 400</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> REST / Jakarta Validation &bull; <strong>Symptom:</strong> Client gets 400 Bad Request</div>
+  <pre><code>MethodArgumentNotValidException: Validation failed for argument [0]: Field error in 'userDto' on field 'email'</code></pre>
+  <p><strong>Root Cause:</strong> An incoming JSON request payload violated one or more DTO annotations (e.g. <code>@NotBlank</code>, <code>@Email</code>, <code>@Min</code>).</p>
+  <ul>
+    <li><strong>Remediation:</strong> Intercept via <code>handleMethodArgumentNotValid</code> in <code>@RestControllerAdvice</code>, extract all field violations into a structured error dictionary, and return RFC 9457 <code>ProblemDetail</code>.</li>
+  </ul>
+</div>
+
+<div class="error-card warn">
+  <div class="card-header">
+    <span class="error-code">ERR-WEB-002: HttpMessageNotReadableException</span>
+    <span class="badge badge-warn">HTTP 400</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> JSON Deserialization &bull; <strong>Symptom:</strong> Unparseable JSON body</div>
+  <pre><code>HttpMessageNotReadableException: JSON parse error: Cannot deserialize value of type Instant from String</code></pre>
+  <p><strong>Root Cause:</strong> Jackson JSON parsing failure due to invalid syntax, non-matching date/time formats, or unknown Enum values.</p>
+  <ul>
+    <li><strong>Remediation:</strong> Add <code>@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")</code> on date fields, or configure <code>DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL</code>.</li>
+  </ul>
+</div>
+
+<h2 class="section-title">3. Database & Persistence Errors</h2>
+
+<div class="error-card error">
+  <div class="card-header">
+    <span class="error-code">ERR-DB-001: Connection Pool Exhaustion (HikariPool Timeout)</span>
+    <span class="badge badge-error">HTTP 500 / 503</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> Database / Connection Pool &bull; <strong>Symptom:</strong> Cascading API latency & timeouts</div>
+  <pre><code>java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms.</code></pre>
+  <p><strong>Root Cause:</strong> All connections in the pool are checked out. Threads are blocked waiting for connections to be returned.</p>
+  <ul>
+    <li><strong>Remediation 1:</strong> Ensure long external REST/Kafka calls are <strong>never</strong> executed inside a <code>@Transactional</code> method.</li>
+    <li><strong>Remediation 2:</strong> Enable connection leak detection: <code>spring.datasource.hikari.leak-detection-threshold=2000</code>.</li>
+    <li><strong>Remediation 3:</strong> Tune pool size: <code>spring.datasource.hikari.maximum-pool-size=20</code> and add indexes to slow queries.</li>
+  </ul>
+</div>
+
+<div class="error-card error">
+  <div class="card-header">
+    <span class="error-code">ERR-DB-002: MongoSocketOpenException / Connection Refused</span>
+    <span class="badge badge-error">Database Down</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> NoSQL / MongoDB &bull; <strong>Symptom:</strong> Storage/Auth operations fail completely</div>
+  <pre><code>com.mongodb.MongoSocketOpenException: Exception opening socket
+Caused by: java.net.ConnectException: Connection refused: no further information</code></pre>
+  <p><strong>Root Cause:</strong> MongoDB daemon is down, not bound to localhost/0.0.0.0, or container port 27017 is unreachable.</p>
+  <ul>
+    <li><strong>Remediation:</strong> Verify MongoDB container is running with <code>docker ps</code> and verify <code>spring.data.mongodb.uri</code> host/credentials.</li>
+  </ul>
+</div>
+
+<div class="error-card warn">
+  <div class="card-header">
+    <span class="error-code">ERR-DB-003: LazyInitializationException</span>
+    <span class="badge badge-error">HTTP 500</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> JPA / Hibernate &bull; <strong>Symptom:</strong> Failure during entity serialization</div>
+  <pre><code>org.hibernate.LazyInitializationException: could not initialize proxy [com.example.Order#1] - no Session</code></pre>
+  <p><strong>Root Cause:</strong> Accessing a <code>fetch = FetchType.LAZY</code> child property after the Hibernate session / transaction has already closed.</p>
+  <ul>
+    <li><strong>Remediation (Best):</strong> Use DTO projections and join-fetch queries (<code>SELECT o FROM Order o JOIN FETCH o.items</code>) or <code>@EntityGraph</code>.</li>
+  </ul>
+</div>
+
+<h2 class="section-title">4. Event-Driven Messaging Errors (Apache Kafka)</h2>
+
+<div class="error-card error">
+  <div class="card-header">
+    <span class="error-code">ERR-MSG-001: RecordDeserializationException / ClassNotFoundException</span>
+    <span class="badge badge-error">Consumer Blocked</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> Apache Kafka / Deserialization &bull; <strong>Symptom:</strong> Listener loop continuously fails</div>
+  <pre><code>ListenerExecutionFailedException: Error deserializing key/value for partition raw-logs-topic-0
+Caused by: java.lang.ClassNotFoundException: com.example.IngestionService.dto.LogPayload</code></pre>
+  <p><strong>Root Cause:</strong> Kafka <code>JsonSerializer</code> injected producer class headers, but the consumer lives in another package or module.</p>
+  <ul>
+    <li><strong>Remediation 1:</strong> Configure <code>spring.kafka.consumer.properties.spring.json.type.mapping</code> to map producer DTO to consumer DTO.</li>
+    <li><strong>Remediation 2:</strong> Wrap value deserializer with Spring's <code>ErrorHandlingDeserializer</code> and route poison-pill messages to a Dead-Letter Topic (DLT).</li>
+  </ul>
+</div>
+
+<h2 class="section-title">5. JVM, Memory & Runtime Errors</h2>
+
+<div class="error-card critical">
+  <div class="card-header">
+    <span class="error-code">ERR-JVM-001: OutOfMemoryError: Java heap space</span>
+    <span class="badge badge-fatal">JVM Crash</span>
+  </div>
+  <div class="meta-row"><strong>Category:</strong> JVM Resource &bull; <strong>Symptom:</strong> Application becomes unresponsive and terminates</div>
+  <pre><code>java.lang.OutOfMemoryError: Java heap space
+Dumping heap to java_pid.hprof ...</code></pre>
+  <p><strong>Root Cause:</strong> The application allocated more memory than available in <code>-Xmx</code>, and garbage collection reclaimed insufficient memory.</p>
+  <ul>
+    <li><strong>Remediation 1:</strong> Enforce database pagination: never allow unrestricted <code>findAll()</code> across unbounded tables.</li>
+    <li><strong>Remediation 2:</strong> Capture heap dump on crash: <code>-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps</code> and inspect with Eclipse MAT.</li>
+  </ul>
+</div>
+
+<h2 class="section-title">6. Summary Diagnostic Matrix for AI / RAG Systems</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Exception Class</th>
+      <th>Status</th>
+      <th>Primary Root Cause</th>
+      <th>First Diagnostic Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>ERR-START-001</strong></td>
+      <td><code>NoSuchBeanDefinitionException</code></td>
+      <td>Startup Crash</td>
+      <td>Missing bean annotation or package scan mismatch</td>
+      <td>Check <code>@Service</code> and base package</td>
+    </tr>
+    <tr>
+      <td><strong>ERR-START-002</strong></td>
+      <td><code>BeanCurrentlyInCreationException</code></td>
+      <td>Startup Crash</td>
+      <td>Circular dependency between beans</td>
+      <td>Refactor or apply <code>@Lazy</code></td>
+    </tr>
+    <tr>
+      <td><strong>ERR-WEB-001</strong></td>
+      <td><code>MethodArgumentNotValidException</code></td>
+      <td>HTTP 400</td>
+      <td>Jakarta <code>@Valid</code> constraints failed</td>
+      <td>Inspect field errors in <code>ProblemDetail</code></td>
+    </tr>
+    <tr>
+      <td><strong>ERR-DB-001</strong></td>
+      <td><code>CannotGetJdbcConnectionException</code></td>
+      <td>HTTP 500/503</td>
+      <td>Hikari connection pool exhaustion</td>
+      <td>Check slow queries & non-DB code in transactions</td>
+    </tr>
+    <tr>
+      <td><strong>ERR-DB-002</strong></td>
+      <td><code>MongoSocketOpenException</code></td>
+      <td>Database Down</td>
+      <td>MongoDB unreachable or port not open</td>
+      <td>Verify MongoDB container & connection URI</td>
+    </tr>
+    <tr>
+      <td><strong>ERR-MSG-001</strong></td>
+      <td><code>RecordDeserializationException</code></td>
+      <td>Consumer Loop Error</td>
+      <td>Kafka type-header mismatch or poison message</td>
+      <td>Configure type mapping or ErrorHandlingDeserializer</td>
+    </tr>
+    <tr>
+      <td><strong>ERR-JVM-001</strong></td>
+      <td><code>OutOfMemoryError</code></td>
+      <td>JVM Terminated</td>
+      <td>Heap exhaustion / unbounded memory allocation</td>
+      <td>Inspect heap dump & enforce query pagination</td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>
