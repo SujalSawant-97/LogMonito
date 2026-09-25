@@ -1,0 +1,16 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: demo-order-service
+
+# LogMonito Client SDK Configuration
+monitor:
+  enabled: true
+  # Points to the LogMonito API Gateway
+  server-url: ${MONITOR_SERVER_URL:http://localhost:8080}
+  # Set your API key generated from the LogMonito React Dashboard (http://localhost:5173)
+  api-key: ${MONITOR_API_KEY:REPLACE_WITH_YOUR_GENERATED_API_KEY}
+  # Threshold: Only monitor runtime errors and unhandled exceptions (drops INFO, DEBUG, WARN)
+  log-level: ERROR
