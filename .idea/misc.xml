@@ -5,6 +5,11 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/Backend Application/AnalyzerService/pom.xml" />
+        <option value="$PROJECT_DIR$/Backend Application/AuthServiceMon/pom.xml" />
+        <option value="$PROJECT_DIR$/Backend Application/StorageService/pom.xml" />
+        <option value="$PROJECT_DIR$/Backend Application/IngestionService/pom.xml" />
+        <option value="$PROJECT_DIR$/Backend Application/ApiGatewayMonitor/pom.xml" />
+        <option value="$PROJECT_DIR$/Custom SDK/monitor-spring-boot-starter/pom.xml" />
       </list>
     </option>
   </component>

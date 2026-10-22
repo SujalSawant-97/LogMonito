@@ -6,13 +6,39 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="ApiGatewayMonitor" />
+      </profile>
+      <profile name="Annotation profile for StorageService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/unknown/lombok-unknown.jar" />
+        </processorPath>
+        <module name="AuthServiceMon" />
         <module name="AnalyzerService" />
+        <module name="IngestionService" />
+        <module name="StorageService" />
+      </profile>
+      <profile name="Annotation profile for monitor-spring-boot-starter" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/springframework/boot/spring-boot-configuration-processor/unknown/spring-boot-configuration-processor-unknown.jar" />
+        </processorPath>
+        <module name="monitor-spring-boot-starter" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AnalyzerService" options="-parameters" />
+      <module name="ApiGatewayMonitor" options="-parameters" />
+      <module name="AuthServiceMon" options="-parameters" />
+      <module name="IngestionService" options="-parameters" />
+      <module name="StorageService" options="-parameters" />
+      <module name="monitor-spring-boot-starter" options="-parameters" />
     </option>
   </component>
 </project>

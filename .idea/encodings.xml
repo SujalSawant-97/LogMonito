@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="PROJECT" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Backend Application/AnalyzerService/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Backend Application/ApiGatewayMonitor/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Backend Application/AuthServiceMon/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Backend Application/IngestionService/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Backend Application/StorageService/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Custom SDK/monitor-spring-boot-starter/src/main/java" charset="UTF-8" />
   </component>
 </project>
